@@ -12,15 +12,24 @@ const config: any = {
     mode: Phaser.Scale.ENVELOP,
     parent: 'app',
     autoCenter: Phaser.Scale.CENTER_BOTH,
-    width: 750,
-    height: 1334,
+    width: 360,
+    height: 640,
     min: {
-      width: 750,
-      height: 1334
+      width: 360,
+      height: 640
     },
     max: {
-      width: 750,
-      height: 1334
+      width: 360,
+      height: 640
+    }
+  },
+  title: '怪物',
+  pixelArt: false,
+  physics: {
+    default: 'arcade',
+    arcade: {
+      gravity: { y: 1000 },
+      debug: true
     }
   },
   scene
