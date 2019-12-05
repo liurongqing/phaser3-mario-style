@@ -104,16 +104,16 @@ export default class Main extends Phaser.Scene {
         this.player.anims.play('walking')
       }
     } else {
+      this.player.body.setVelocityX(0)
       this.player.anims.stop('walking')
       if (onGround) {
         this.player.setFrame(3)
       }
-
-      if (onGround && (this.cursors.space.isDown || this.cursors.up.isDown)) {
-        this.player.body.setVelocityY(this.jumpSpeed)
-        this.player.anims.stop('walking')
-        this.player.setFrame(2)
-      }
+    }
+    if (onGround && (this.cursors.space.isDown || this.cursors.up.isDown)) {
+      this.player.body.setVelocityY(this.jumpSpeed)
+      this.player.anims.stop('walking')
+      this.player.setFrame(2)
     }
   }
 
