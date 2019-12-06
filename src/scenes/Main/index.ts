@@ -7,6 +7,8 @@ export default class Main extends Phaser.Scene {
   jumpSpeed: any
   levelData: any
   barrels: any
+  fires: any // 火
+  goal: any // 目标
   constructor() {
     super('mainScene')
   }
@@ -67,23 +69,30 @@ export default class Main extends Phaser.Scene {
   }
 
   create() {
-    this.physics.world.bounds.width = 360
-    this.physics.world.bounds.height = 700
+    this.levelData = this.cache.json.get('levelData')
 
-    this.setupLevel()
-    this.player = this.add.sprite(180, 400, 'player', 3)
-    this.physics.add.existing(this.player)
-    this.player.body.setCollideWorldBounds(true)
-
-    this.physics.add.collider(this.player, this.platforms)
-
-    this.cursors = this.input.keyboard.createCursorKeys()
-
+    // 创建动画
     this.createAnims()
 
-    this.input.on('pointerdown', (pointer: any) => {
-      console.log(pointer.x, pointer.y)
-    })
+    // 设置层级
+    this.setupLevel()
+
+    // 设置子弹
+    this.setupSpawner()
+
+    this.physics.add.collider(
+      [this.player, this.goal, this.barrels],
+      this.platforms
+    )
+
+    this.physics.add.overlap(
+      this.player,
+      [this.fires, this.goal, this.barrels],
+      this.restartGame,
+      null,
+      this
+    )
+    this.cursors = this.input.keyboard.createCursorKeys()
   }
 
   update() {
@@ -118,19 +127,41 @@ export default class Main extends Phaser.Scene {
   }
 
   createAnims() {
-    this.anims.create({
-      key: 'walking',
-      frames: this.anims.generateFrameNames('player', {
-        frames: [0, 1, 2] as any
-      }),
-      frameRate: 12,
-      yoyo: true,
-      repeat: -1
-    })
+    // 人物动画
+    if (!this.anims.get('walking')) {
+      this.anims.create({
+        key: 'walking',
+        frames: this.anims.generateFrameNames('player', {
+          frames: [0, 1, 2] as any
+        }),
+        frameRate: 12,
+        yoyo: true,
+        repeat: -1
+      })
+    }
+
+    // 火动画
+    if (!this.anims.get('burning')) {
+      this.anims.create({
+        key: 'burning',
+        frames: this.anims.generateFrameNames('fire', {
+          frames: [0, 1] as any
+        }),
+        frameRate: 4,
+        repeat: -1
+      })
+    }
   }
 
+  //设置地板与火
   setupLevel() {
-    this.platforms = this.add.group()
+    // world bounds
+    this.physics.world.bounds.width = this.levelData.world.width
+    this.physics.world.bounds.height = this.levelData.world.height
+
+    // 添加地板
+    // this.platforms = this.add.group()
+    this.platforms = this.physics.add.staticGroup()
     for (let i = 0; i < this.levelData.platforms.length; i++) {
       let current = this.levelData.platforms[i]
       let newObj: any
@@ -155,5 +186,101 @@ export default class Main extends Phaser.Scene {
       this.physics.add.existing(newObj, true)
       this.platforms.add(newObj)
     }
+
+    // 添加火
+    // this.fires = this.add.group()
+    this.fires = this.physics.add.group({
+      allowGravity: false,
+      immovable: true
+    })
+    for (let i = 0; i < this.levelData.fires.length; i++) {
+      let current = this.levelData.fires[i]
+      // let newObj = this.fires.create(current.x, current.y, 'fire').setOrigin(0)
+      let newObj = this.add.sprite(current.x, current.y, 'fire').setOrigin(0)
+      newObj.anims.play('burning')
+      this.fires.add(newObj)
+      newObj.setInteractive()
+      this.input.setDraggable(newObj)
+    }
+
+    this.input.on(
+      'drag',
+      (pointer: any, gameObject: any, dragX: any, dragY: any) => {
+        gameObject.x = dragX
+        gameObject.y = dragY
+      }
+    )
+
+    this.player = this.add.sprite(
+      this.levelData.player.x,
+      this.levelData.player.y,
+      'player',
+      3
+    )
+    this.physics.add.existing(this.player)
+    this.player.body.setCollideWorldBounds(true)
+
+    // camera bounds
+    this.cameras.main.setBounds(
+      0,
+      0,
+      this.levelData.world.width,
+      this.levelData.world.height
+    )
+    this.cameras.main.startFollow(this.player)
+
+    // 目标
+    this.goal = this.add.sprite(
+      this.levelData.goal.x,
+      this.levelData.goal.y,
+      'goal'
+    )
+    this.physics.add.existing(this.goal)
+  }
+
+  // 设置子弹
+  setupSpawner() {
+    this.barrels = this.physics.add.group({
+      bounceY: 0.1,
+      bounceX: 1,
+      collideWorldBounds: true
+    })
+
+    const spawningEvent = this.time.addEvent({
+      delay: this.levelData.spawner.interval,
+      loop: true,
+      callback: () => {
+        let barrel = this.barrels.get(this.goal.x, this.goal.y, 'barrel')
+        // let barrel = this.barrels.create(this.goal.x, this.goal.y, 'barrel')
+        // 重新激活
+        barrel.setActive(true)
+        barrel.setVisible(true)
+        barrel.body.enable = true
+
+        barrel.setVelocityX(this.levelData.spawner.speed)
+        //console.log(this.barrels.getChildren().length)
+
+        // lifespan
+        this.time.addEvent({
+          delay: this.levelData.spawner.lifespan,
+          repeat: 0,
+          callback: () => {
+            // barrel.destroy()
+            this.barrels.killAndHide(barrel)
+            barrel.body.enable = false
+          }
+        })
+      }
+    })
+  }
+
+  restartGame(sourceSprite: any, targetSprite: any) {
+    this.cameras.main.fade(500)
+    this.cameras.main.on(
+      'camerafadeoutcomplete',
+      (camera: any, effect: any) => {
+        this.scene.restart()
+      }
+    )
   }
 }
